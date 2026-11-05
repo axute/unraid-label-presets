@@ -13,7 +13,7 @@ function lp_asset(string $path): string {
 
 function lp_inject(): void {
     echo '<link type="text/css" rel="stylesheet" href="' . htmlspecialchars(lp_asset('css/labelbook.css')) . '">' . "\n";
-    foreach (['js/formbridge.js', 'js/devtest.js'] as $js) {
+    foreach (['js/formbridge.js', 'js/resolve.js', 'js/devtest.js'] as $js) {
         echo '<script src="' . htmlspecialchars(lp_asset($js)) . '"></script>' . "\n";
     }
 }
