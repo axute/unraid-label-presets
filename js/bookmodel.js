@@ -29,11 +29,15 @@
   }
 
   function nsGroups(service) {
-    return (service.groups || []).filter(function (g) { return g.scope !== 'container'; });
+    return (service.groups || []).filter(function (g) { return g.scope !== 'container' && !g.repeat; });
   }
   function containerGroups(service) {
-    return (service.groups || []).filter(function (g) { return g.scope === 'container'; });
+    return (service.groups || []).filter(function (g) { return g.scope === 'container' && !g.repeat; });
   }
+  function repeatGroups(service) {
+    return (service.groups || []).filter(function (g) { return !!g.repeat; });
+  }
+  function rKey(pattern, prefix) { return str(pattern).split('${R}').join(prefix); }
 
   // ---------------------------------------------------------------- index page
 
@@ -72,8 +76,18 @@
       namespaces: R.detectNamespaces(service, ctx.formLabels || [], name),
       active: 0,
       display: service.display || settings.defaultDisplay || 'advanced',
-      displayTouched: false
+      displayTouched: false,
+      repeat: {},
+      open: {}
     };
+    repeatGroups(service).forEach(function (g) {
+      var det = R.detectRepeat(g.repeat, st.formList);
+      st.repeat[g.name] = {
+        form: det.form,
+        seq: det.blocks.length,
+        blocks: det.blocks.map(function (b, i) { return { id: 'b' + i, src: b.prefix, removed: false }; })
+      };
+    });
     return st;
   }
 
@@ -157,6 +171,9 @@
       if (def.max != null && +v > def.max) return 'höchstens ' + def.max;
     } else if (t === 'bool') {
       if (v !== 'true' && v !== 'false') return 'true oder false erwartet';
+    } else if (t === 'schedule') {
+      var ps = R.parseSchedule(v);
+      if (ps.error) return ps.error;
     } else if (t === 'enum') {
       if ((def.options || []).indexOf(v) < 0) return 'erlaubt: ' + (def.options || []).join(', ');
     }
@@ -170,13 +187,14 @@
   function rowId(ns, st, key) { return nsId(st.kind, ns) + '|' + key; }
 
   /** One label row for a namespace (null for container scope). */
-  function row(st, ns, def, group) {
+  function row(st, ns, def, group, rep) {
     var vars = varsFor(st, ns);
-    var key = R.keyFor(def.key, st.kind, ns);
+    var key = rep ? rKey(def.key, rep.prefix) : R.keyFor(def.key, st.kind, ns);
+    var srcKey = rep ? (rep.src ? rKey(def.key, rep.src) : null) : key;
     var prop = R.resolve(def.value, vars);
-    var existing = own(st.form, key) ? st.form[key] : null;
+    var existing = srcKey && own(st.form, srcKey) ? st.form[srcKey] : null;
     var extra = own(st.extra, key) ? st.extra[key] : null;
-    var id = rowId(ns, st, key);
+    var id = rep ? rep.id + '|' + def.key : rowId(ns, st, key);
     var d = st.drafts[id];
     if (!d) {
       d = st.drafts[id] = {
@@ -193,7 +211,7 @@
     var xss = R.xssFilter(value);
     var sources = R.varsIn(def.value).map(function (n) { return st.auto.sources[n] ? st.auto.sources[n] + ': ' + (st.auto.vars[n] || '') : ''; }).filter(Boolean);
     return {
-      id: id, ns: ns, group: group, def: def, key: key, value: value,
+      id: id, ns: ns, group: group, def: def, key: key, srcKey: srcKey, value: value,
       proposed: prop.value, proposedComplete: !prop.missing.length,
       existing: existing, extra: extra, checked: d.checked, touched: d.touched,
       status: status, error: error, missing: missing,
@@ -207,6 +225,7 @@
     containerGroups(st.service).forEach(function (g) {
       out.push({ group: g, scope: 'container', rows: (g.labels || []).map(function (d) { return row(st, null, d, g); }) });
     });
+    repeatGroups(st.service).forEach(function (g) { out.push(repeatGroupRows(st, g)); });
     var ns = activeNs(st);
     if (ns) {
       nsGroups(st.service).forEach(function (g) {
@@ -216,6 +235,48 @@
     return out;
   }
 
+  /** Rows of a repeat group: one set per live block, plus unknown fields found under a block. */
+  function repeatGroupRows(st, g) {
+    var info = st.repeat[g.name];
+    var live = info.blocks.filter(function (b) { return !b.removed; });
+    var prefixes = R.repeatPrefixes(g.repeat, live.length);
+    var known = (g.labels || []).map(function (d) { return d.key.replace('${R}', ''); });
+    var blocks = live.map(function (b, i) {
+      var rep = { id: g.name + ':' + b.id, prefix: prefixes[i], src: b.src };
+      var rows = (g.labels || []).map(function (d) { return row(st, null, d, g, rep); });
+      if (b.src) {
+        st.formList.forEach(function (l) {
+          if (l.key.indexOf(b.src) !== 0) return;
+          var field = l.key.slice(b.src.length);
+          if (known.indexOf(field) >= 0) return;
+          if (/^\d+\]\./.test(field)) return; // other indexed blocks when src is the single form
+          rows.push(row(st, null, { key: '${R}' + field, value: '', title: field, type: 'text' }, g, rep));
+        });
+      }
+      return { block: b, index: i, prefix: prefixes[i], rows: rows };
+    });
+    var removed = info.blocks.filter(function (b) { return b.removed && b.src; }).map(function (b) {
+      return { block: b, labels: st.formList.filter(function (l) { return l.key.indexOf(b.src) === 0 && !/^\d+\]\./.test(l.key.slice(b.src.length)); }) };
+    });
+    return { group: g, scope: 'repeat', form: info.form, blocks: blocks, removed: removed };
+  }
+
+  function addBlock(st, groupName) {
+    var info = st.repeat[groupName];
+    if (!info) return;
+    info.blocks.push({ id: 'b' + (info.seq++), src: null, removed: false });
+  }
+  function removeBlock(st, groupName, blockId) {
+    var info = st.repeat[groupName];
+    if (!info) return;
+    info.blocks = info.blocks.filter(function (b) {
+      if (b.id !== blockId) return true;
+      if (!b.src) return false;
+      b.removed = true; return true;
+    });
+  }
+  function setOpen(st, groupKey, open) { st.open[groupKey] = !!open; }
+
   /** Form labels with the service prefix that the catalog does not know. */
   function unknownLabels(st) {
     var prefix = str(st.service.prefix);
@@ -224,8 +285,14 @@
     (st.service.groups || []).forEach(function (g) {
       (g.labels || []).forEach(function (l) { regs.push(R.patternRegex(l.key, st.kind)); });
     });
+    var reps = repeatGroups(st.service).map(function (g) {
+      var parts = str(g.repeat.multi).split('${I}');
+      return { single: str(g.repeat.single), multi: new RegExp('^' + parts[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\d+') };
+    });
     return st.formList.filter(function (l) {
-      return l.key.indexOf(prefix) === 0 && !regs.some(function (re) { return re.test(l.key); });
+      if (l.key.indexOf(prefix) !== 0) return false;
+      if (reps.some(function (r) { return (r.single && l.key.indexOf(r.single) === 0) || r.multi.test(l.key); })) return false;
+      return !regs.some(function (re) { return re.test(l.key); });
     });
   }
 
@@ -239,6 +306,9 @@
   function allRows(st) {
     var out = [];
     containerGroups(st.service).forEach(function (g) { (g.labels || []).forEach(function (d) { out.push(row(st, null, d, g)); }); });
+    repeatGroups(st.service).forEach(function (g) {
+      repeatGroupRows(st, g).blocks.forEach(function (b) { b.rows.forEach(function (r) { out.push(r); }); });
+    });
     if (st.kind !== 'none') {
       st.namespaces.forEach(function (ns) {
         nsGroups(st.service).forEach(function (g) { (g.labels || []).forEach(function (d) { out.push(row(st, ns, d, g)); }); });
@@ -255,6 +325,14 @@
   function plan(st) {
     var p = { add: [], update: [], remove: [], errors: [], warnings: [] };
     if (st.kind === 'split') { p.errors.push({ key: '', error: 'Namespace-Art split ist im Buch noch nicht umgesetzt.' }); return p; }
+    repeatGroups(st.service).forEach(function (g) {
+      var info = st.repeat[g.name];
+      if (info.form === 'mixed') p.errors.push({ key: g.repeat.single + '* / ' + g.repeat.multi.replace('${I}', 'n') + '*', error: 'beide Schreibweisen gleichzeitig vorhanden – bitte zuerst von Hand bereinigen' });
+      repeatGroupRows(st, g).removed.forEach(function (b) {
+        b.labels.forEach(function (l) { p.remove.push({ num: l.num, key: l.key, value: l.value }); });
+      });
+    });
+    if (p.errors.length) return p;
     allRows(st).forEach(function (r) {
       if (!r.checked) {
         if (r.existing) p.remove.push({ num: r.existing.num, key: r.key, value: r.existing.value });
@@ -263,7 +341,10 @@
       if (r.error) { p.errors.push({ key: r.key, error: r.error }); return; }
       if (r.xss) p.warnings.push({ key: r.key, text: 'Unraid entfernt < und >: kommt an als „' + r.xss + '“' });
       if (r.extra) p.warnings.push({ key: r.key, text: 'steht zusätzlich in Extra Parameters (der Wert dort gewinnt)' });
-      if (r.existing) {
+      if (r.existing && r.srcKey !== r.key) {
+        // repeat block renumbered: move the label to its new key
+        p.remove.push({ num: r.existing.num, key: r.srcKey, value: r.existing.value, moved: r.key });
+      } else if (r.existing) {
         if (r.value !== r.existing.value) p.update.push({ num: r.existing.num, key: r.key, value: r.value, old: r.existing.value });
         return;
       }
@@ -291,6 +372,9 @@
     validate: validate,
     rows: rows,
     unknownLabels: unknownLabels,
+    addBlock: addBlock,
+    removeBlock: removeBlock,
+    setOpen: setOpen,
     setChecked: setChecked,
     setValue: setValue,
     resetValue: resetValue,

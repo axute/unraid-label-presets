@@ -23,14 +23,20 @@ function lp_check_service(array $s): ?string {
         $scope = $g['scope'] ?? '';
         if (!in_array($scope, ['container', 'namespace', 'split'], true)) return "scope '$scope' unbekannt";
         if ($kind === 'none' && $scope !== 'container') return "namespace none erlaubt nur scope container";
+        $repeat = $g['repeat'] ?? null;
+        if ($repeat !== null) {
+            if ($scope !== 'container') return 'repeat nur bei scope container';
+            if (!is_string($repeat['single'] ?? null) || !is_string($repeat['multi'] ?? null) || strpos($repeat['multi'], '${I}') === false) return 'repeat braucht single und multi mit ${I}';
+        }
         foreach (($g['labels'] ?? []) as $l) {
             $key = $l['key'] ?? '';
             if (!is_string($key) || $key === '') return 'Label ohne key';
             $hasNs = strpos($key, '${NS_KEY}') !== false;
             if ($scope === 'namespace' && !$hasNs) return "$key: scope namespace braucht \${NS_KEY}";
             if ($scope !== 'namespace' && $hasNs) return "$key: \${NS_KEY} nur bei scope namespace";
+            if ($repeat !== null && strpos($key, '${R}') !== 0) return "$key: Felder einer Wiederholung beginnen mit \${R}";
             if (preg_match_all('/\$\{([A-Z0-9_]+)\}/', $key, $m)) {
-                foreach ($m[1] as $v) if ($v !== 'NS_KEY') return "$key: nur \${NS_KEY} im Key erlaubt";
+                foreach ($m[1] as $v) if ($v !== 'NS_KEY' && !($v === 'R' && $repeat !== null)) return "$key: nur \${NS_KEY} im Key erlaubt";
             }
         }
     }

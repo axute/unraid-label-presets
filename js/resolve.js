@@ -224,7 +224,7 @@
       var k = keyFor(service.nameKey, 'index', { index: idx });
       return byKey[k] != null ? str(byKey[k]) : '';
     }
-    res.push({ key: '', index: '', name: nameOf('') || primaryName, primary: true, found: !!seen[''] });
+    res.push({ key: '', index: '', name: nameOf('') || primaryKey, primary: true, found: !!seen[''] });
     Object.keys(seen).filter(function (k) { return k !== ''; })
       .sort(function (a, b) { return a - b; })
       .forEach(function (k) { res.push({ key: k + '.', index: k, name: nameOf(k) || ('#' + k), primary: false, found: true }); });
@@ -341,7 +341,44 @@
     return { changed: tagLike, value: tagLike ? s.replace(/[<>]/g, '') : s };
   }
 
+  // ---------------------------------------------------------------- schedules (Controlarr)
+
+  var DAY = '(?:mon|tue|wed|thu|fri|sat|sun)(?:day|sday|nesday|rsday|urday)?';
+  var DAYS_RE = new RegExp('^(?:daily|weekdays|weekends|' + DAY + '(?:-' + DAY + ')?(?:,' + DAY + '(?:-' + DAY + ')?)*)$', 'i');
+  var TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+  /**
+   * "mon-fri 23:00, sat-sun 01:00" -> { entries: [{ days, time }], error }.
+   * Day lists like "sat,sun" contain commas too, so a piece without a time
+   * is joined to the next one.
+   */
+  function parseSchedule(value) {
+    var s = str(value).trim();
+    if (!s) return { entries: [], error: 'Wert fehlt' };
+    var pieces = s.split(','), entries = [], carry = '';
+    for (var i = 0; i < pieces.length; i++) {
+      var p = (carry ? carry + ',' : '') + pieces[i].trim();
+      var m = /^(?:(\S+)\s+)?(\S+)$/.exec(p);
+      if (!m || !TIME_RE.test(m[2])) {
+        if (/^\S+$/.test(p) && DAYS_RE.test(p) && i + 1 < pieces.length) { carry = p; continue; }
+        return { entries: entries, error: '„' + p + '“: erwartet [Tage] HH:MM' };
+      }
+      if (m[1] && !DAYS_RE.test(m[1])) return { entries: entries, error: '„' + m[1] + '“: unbekannte Tagesangabe' };
+      entries.push({ days: (m[1] || '').toLowerCase(), time: m[2] });
+      carry = '';
+    }
+    if (carry) return { entries: entries, error: '„' + carry + '“: Uhrzeit fehlt' };
+    return { entries: entries, error: null };
+  }
+
+  function formatSchedule(entries) {
+    return (entries || []).filter(function (e) { return e && e.time; })
+      .map(function (e) { return (e.days && e.days !== 'daily' ? e.days + ' ' : '') + e.time; }).join(', ');
+  }
+
   return {
+    parseSchedule: parseSchedule,
+    formatSchedule: formatSchedule,
     sanitizeNs: sanitizeNs,
     parseWebUI: parseWebUI,
     autoVars: autoVars,

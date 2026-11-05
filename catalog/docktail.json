@@ -1,0 +1,69 @@
+{
+  "id": "docktail",
+  "name": "Docktail",
+  "description": "Macht den Container als Tailscale Service im Tailnet erreichbar.",
+  "icon": "fa-shield",
+  "docs": "https://docktail.org/docs/labels/",
+  "prefix": "docktail.",
+  "namespace": "index",
+  "nameKey": "docktail.service.${NS_KEY}name",
+  "display": "advanced",
+  "groups": [
+    {
+      "name": "Basis",
+      "scope": "container",
+      "labels": [
+        { "key": "docktail.service.enable", "type": "bool", "value": "true", "title": "Docktail aktivieren",
+          "description": "Pflicht. Schaltet den Tailscale Service für diesen Container ein.", "recommended": true },
+        { "key": "docktail.service.direct", "type": "bool", "value": "true", "title": "Direkt zur Container-IP",
+          "description": "Standard true: Docktail spricht die Container-IP an. false = über veröffentlichte Host-Ports (z. B. rootless Docker)." },
+        { "key": "docktail.service.network", "type": "text", "value": "${NETWORK}", "title": "Docker-Netzwerk",
+          "description": "Netzwerk für die IP-Erkennung. Standard: bridge oder das erste verfügbare." },
+        { "key": "docktail.tags", "type": "text", "value": "tag:container", "title": "Tailscale-Tags",
+          "description": "Komma-getrennt. Braucht API-Zugang in Docktail. Überschreibt Tags aus der Admin-Konsole." }
+      ]
+    },
+    {
+      "name": "Dienst",
+      "scope": "namespace",
+      "labels": [
+        { "key": "docktail.service.${NS_KEY}name", "type": "text", "value": "${NS}", "title": "Service-Name",
+          "description": "Pflicht. Name des Tailscale Service, z. B. web.", "recommended": true },
+        { "key": "docktail.service.${NS_KEY}port", "type": "port", "value": "${WEBUI_PORT}", "title": "Port im Container",
+          "description": "Pflicht. Port, auf dem die Anwendung im Container lauscht (nicht der Host-Port).", "recommended": true },
+        { "key": "docktail.service.${NS_KEY}description", "type": "text", "value": "${OVERVIEW}", "title": "Beschreibung",
+          "description": "Wird in der Tailscale-Admin-Konsole angezeigt. Braucht API-Zugang." }
+      ]
+    },
+    {
+      "name": "Erweitert",
+      "scope": "namespace",
+      "labels": [
+        { "key": "docktail.service.${NS_KEY}protocol", "type": "enum", "options": ["http", "https", "tcp"], "value": "http", "title": "Protokoll zum Container",
+          "description": "Ohne Label automatisch: https bei Port 443, sonst http." },
+        { "key": "docktail.service.${NS_KEY}service-port", "type": "port", "value": "443", "title": "Port im Tailnet",
+          "description": "Port, auf dem Tailscale lauscht. Ohne Label automatisch: 443 bei https, sonst 80." },
+        { "key": "docktail.service.${NS_KEY}service-protocol", "type": "enum", "options": ["http", "https", "tcp"], "value": "https", "title": "Protokoll im Tailnet",
+          "description": "Ohne Label automatisch: https bei Port 443, tcp bei TCP-Backend, sonst http." },
+        { "key": "docktail.service.${NS_KEY}path", "type": "text", "pattern": "^/", "value": "/", "title": "Pfad",
+          "description": "Nur HTTP(S). Muss mit / beginnen. Standard /." },
+        { "key": "docktail.service.${NS_KEY}proxy-protocol", "type": "enum", "options": ["1", "2"], "value": "2", "title": "PROXY-Protokoll",
+          "description": "Nur TCP. Standard aus." }
+      ]
+    },
+    {
+      "name": "Funnel (öffentlich)",
+      "scope": "container",
+      "labels": [
+        { "key": "docktail.funnel.enable", "type": "bool", "value": "true", "title": "Funnel aktivieren",
+          "description": "Macht den Dienst öffentlich im Internet erreichbar. Braucht „Allow Funnel“ im Tailscale-Plugin." },
+        { "key": "docktail.funnel.port", "type": "port", "value": "${WEBUI_PORT}", "title": "Port im Container",
+          "description": "Pflicht bei Funnel." },
+        { "key": "docktail.funnel.funnel-port", "type": "enum", "options": ["443", "8443", "10000"], "value": "443", "title": "Öffentlicher Port",
+          "description": "Für HTTP(S) erlaubt: 443, 8443, 10000." },
+        { "key": "docktail.funnel.protocol", "type": "enum", "options": ["https", "http", "tcp", "tls-terminated-tcp"], "value": "https", "title": "Protokoll" },
+        { "key": "docktail.funnel.path", "type": "text", "pattern": "^/", "value": "/", "title": "Pfad" }
+      ]
+    }
+  ]
+}

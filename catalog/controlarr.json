@@ -1,0 +1,42 @@
+{
+  "id": "controlarr",
+  "name": "Controlarr",
+  "description": "Stoppt, startet und startet den Container zu festen Uhrzeiten neu.",
+  "icon": "fa-clock-o",
+  "docs": "https://github.com/p1zzm1ssile/Controlarr#setting-a-schedule",
+  "prefix": "controlarr.",
+  "namespace": "none",
+  "display": "advanced",
+  "groups": [
+    {
+      "name": "Zeitplan",
+      "scope": "container",
+      "labels": [
+        { "key": "controlarr.stop", "type": "schedule", "value": "02:00", "title": "Stoppen um",
+          "description": "Uhrzeiten (24 h), optional mit Tagen davor. Zeitzone von Controlarr (TZ)." },
+        { "key": "controlarr.start", "type": "schedule", "value": "07:00", "title": "Starten um" },
+        { "key": "controlarr.restart", "type": "schedule", "value": "04:00", "title": "Neu starten um" },
+        { "key": "controlarr.days", "type": "text", "value": "mon-fri", "title": "Tage für alle Zeiten",
+          "description": "Gilt für den ganzen Zeitplan. Ohne Label: jeden Tag. Beispiele: mon-fri, weekends, sat,sun." }
+      ]
+    },
+    {
+      "name": "Startreihenfolge",
+      "scope": "container",
+      "labels": [
+        { "key": "controlarr.order", "type": "number", "value": "100", "title": "Reihenfolge",
+          "description": "Kleiner startet früher, wenn mehrere Container gleichzeitig starten. Standard 100." },
+        { "key": "controlarr.delay", "type": "number", "min": 0, "value": "60", "title": "Wartezeit danach (s)",
+          "description": "Sekunden nach dem Start, bevor der nächste startet. 0 = keine. Ohne Label bestimmt Controlarr den Wert selbst." }
+      ]
+    },
+    {
+      "name": "Basis",
+      "scope": "container",
+      "labels": [
+        { "key": "controlarr.enable", "type": "bool", "value": "false", "title": "Zeitplan aktiv",
+          "description": "false = Zeitplan dieses Containers ignorieren. Ohne Label ist er aktiv." }
+      ]
+    }
+  ]
+}

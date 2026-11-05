@@ -72,6 +72,7 @@
   function renderIndex() {
     st = null;
     $dlg.empty();
+    $dlg.closest('.ui-dialog').find('.lp-summary').remove();
     $dlg.dialog('option', 'title', 'Label-Buch' + (ctx.container.name ? ' · ' + ctx.container.name : ''));
     setButtons([{ text: 'Schließen', click: function () { $dlg.dialog('close'); } }]);
 
@@ -129,6 +130,7 @@
 
   function renderService(service) {
     st = LP.model.createState(service, ctx);
+    st.textMode = {};
     $dlg.dialog('option', 'title', service.name + (ctx.container.name ? ' · ' + ctx.container.name : ''));
     setButtons([
       { text: '← Index', click: function () { renderIndex(); } },
@@ -151,40 +153,117 @@
     var needsName = st.kind !== 'none' && !st.containerName;
     if (needsName) $dlg.append(el('div', 'lp-note lp-warn').append(icon('exclamation-triangle'), el('span', null, ' Bitte zuerst oben im Formular einen Containernamen vergeben. Er ist der erste Namespace.')));
 
-    // global variables
     var globals = M.globalVars(st);
-    if (globals.length) {
-      $dlg.append(globalsBlock(globals));
-      if (globals.some(function (g) { return !g.set; })) $dlg.find('.lp-vars').last().append(el('p', 'lp-muted lp-hint', 'Dauerhaft setzen kannst du globale Werte später auf der Einstellungsseite.'));
-    }
+    if (globals.length) $dlg.append(globalsBlock(globals));
 
-    // container groups
     var groups = M.rows(st);
-    groups.filter(function (g) { return g.scope === 'container'; }).forEach(function (g) { $dlg.append(groupBlock(g)); });
+    groups.filter(function (g) { return g.scope === 'container'; }).forEach(function (g) { $dlg.append(groupBlock(g, '_')); });
+    groups.filter(function (g) { return g.scope === 'repeat'; }).forEach(function (g) { $dlg.append(repeatBlock(g)); });
 
-    // namespaces
     if (st.kind !== 'none' && !needsName) {
-      $dlg.append(nsBar());
       var ns = M.activeNs(st);
+      $dlg.append(nsBar());
       var asked = M.askedVars(st, ns);
       if (asked.length) $dlg.append(askedBlock(asked, ns));
-      groups.filter(function (g) { return g.scope === 'namespace'; }).forEach(function (g) { $dlg.append(groupBlock(g)); });
+      groups.filter(function (g) { return g.scope === 'namespace'; }).forEach(function (g) { $dlg.append(groupBlock(g, 'ns:' + ns.name)); });
     }
 
     var unknown = M.unknownLabels(st);
     if (unknown.length) {
-      var $d = $('<details class="lp-unknown"></details>').append(el('summary', null, 'Weitere vorhandene Labels (' + unknown.length + ')'));
-      var $ul = el('ul');
+      var $d = $('<details class="lp-grp lp-unknown"></details>').append(el('summary').append(el('b', null, 'Weitere vorhandene Labels'), el('span', 'lp-counts').append(pill('', unknown.length + ' unbekannt'))));
+      var $ul = el('ul', 'lp-unknown-list');
       unknown.forEach(function (l) { $ul.append(el('li').append(el('code', null, l.key), ' = ', el('code', null, l.value))); });
-      $dlg.append($d.append($ul, el('p', 'lp-muted', 'Diese Labels kennt der Katalog nicht. Das Buch lässt sie unverändert.')));
+      $dlg.append($d.append(el('div', 'lp-grp-body').append($ul, el('p', 'lp-muted lp-hint', 'Diese Labels kennt der Katalog nicht. Das Buch lässt sie unverändert.'))));
     }
 
     $dlg.append(displayToggle());
+    updateSummary();
     $dlg.scrollTop(scroll);
   }
 
+  function pill(cls, text) { return el('span', 'lp-pill ' + cls, text); }
+
+  // ---- collapsible group shell with a summary line
+  function groupShell(key, title, sub, counts, autoOpen) {
+    var open = Object.prototype.hasOwnProperty.call(st.open, key) ? st.open[key] : autoOpen;
+    var $d = $('<details class="lp-grp"></details>').prop('open', !!open);
+    var $sum = el('summary').append(el('b', null, title));
+    if (sub) $sum.append(el('span', 'lp-muted lp-sub', sub));
+    $sum.append(counts);
+    $d.append($sum);
+    $d.on('toggle', function () { LP.model.setOpen(st, key, this.open); });
+    return $d;
+  }
+
+  function countsOf(rows) {
+    var c = { abweichend: 0, neu: 0, vorhanden: 0, extra: 0, remove: 0, error: 0, on: 0 };
+    rows.forEach(function (r) {
+      if (r.checked) c.on++;
+      if (r.checked && r.error) c.error++;
+      if (r.existing && !r.checked) c.remove++;
+      else if (r.checked || r.status === 'extra') c[r.status]++;
+    });
+    return c;
+  }
+
+  function countPills(c) {
+    var $c = el('span', 'lp-counts');
+    if (c.error) $c.append(pill('lp-st-err', c.error + ' Fehler'));
+    if (c.abweichend) $c.append(pill('lp-st-diff', c.abweichend + ' abweichend'));
+    if (c.remove) $c.append(pill('lp-st-err', c.remove + ' entfernen'));
+    if (c.neu) $c.append(pill('lp-st-new', c.neu + ' neu'));
+    if (c.vorhanden) $c.append(pill('lp-st-ok', c.vorhanden + ' vorhanden'));
+    if (c.extra) $c.append(pill('lp-st-extra', c.extra + ' in Extra Parameters'));
+    if (!$c.children().length) $c.append(el('span', 'lp-muted', 'nichts ausgewählt'));
+    return $c;
+  }
+
+  function needsAttention(c) { return !!(c.error || c.abweichend || c.remove || c.neu || c.extra); }
+
+  function groupBlock(g, scopeKey) {
+    var c = countsOf(g.rows);
+    var sub = (g.scope === 'container' ? 'pro Container' : (LP.model.activeNs(st) || {}).name) + ' · ' + c.on + '/' + g.rows.length + ' aktiv';
+    var $d = groupShell(scopeKey + '|' + g.group.name, g.group.name, sub, countPills(c), needsAttention(c));
+    var $body = el('div', 'lp-grp-body lp-rows');
+    g.rows.forEach(function (r) { $body.append(labelRow(r)); });
+    return $d.append($body);
+  }
+
+  function repeatBlock(g) {
+    var all = [];
+    g.blocks.forEach(function (b) { all = all.concat(b.rows); });
+    var c = countsOf(all);
+    c.remove += g.removed.reduce(function (n, b) { return n + b.labels.length; }, 0);
+    var sub = g.blocks.length + ' ' + g.group.name + (g.blocks.length === 1 ? '' : 's');
+    var $d = groupShell('rep|' + g.group.name, g.group.name, sub, countPills(c), needsAttention(c) || g.form === 'mixed');
+    var $body = el('div', 'lp-grp-body');
+    if (g.form === 'mixed') $body.append(el('div', 'lp-note lp-warn', 'Beide Schreibweisen (' + g.group.repeat.single + '… und ' + g.group.repeat.multi.replace('${I}', 'n') + '…) sind gleichzeitig vorhanden. Bitte zuerst von Hand bereinigen.'));
+    g.blocks.forEach(function (b, i) {
+      var $card = el('div', 'lp-block');
+      var $h = el('div', 'lp-block-head').append(el('b', null, g.group.name + ' ' + (i + 1)), el('code', 'lp-muted', b.prefix + '…'));
+      var $rm = el('button', 'lp-mini', 'entfernen').attr('type', 'button').on('click', function () { LP.model.removeBlock(st, g.group.name, b.block.id); redraw(); });
+      $card.append($h.append($rm));
+      var $rows = el('div', 'lp-rows');
+      b.rows.forEach(function (r) { $rows.append(labelRow(r)); });
+      $body.append($card.append($rows));
+    });
+    g.removed.forEach(function (b) {
+      $body.append(el('div', 'lp-block lp-block-removed').append(el('div', 'lp-block-head').append(
+        el('span', null, b.labels.length + ' Labels unter ' + b.block.src + '… werden entfernt'),
+        el('button', 'lp-mini', 'rückgängig').attr('type', 'button').on('click', function () { b.block.removed = false; redraw(); }))));
+    });
+    var $add = el('button', 'lp-mini lp-add', '+ ' + g.group.name + ' hinzufügen').attr('type', 'button')
+      .on('click', function () { LP.model.addBlock(st, g.group.name); LP.model.setOpen(st, 'rep|' + g.group.name, true); redraw(); });
+    $body.append($add);
+    if (g.blocks.length === 1) $body.append(el('p', 'lp-muted lp-hint', 'Ab zwei ' + g.group.name + 's schreibt das Buch die Labels automatisch in die nummerierte Form um (' + g.group.repeat.multi.replace('${I}', '0') + '…).'));
+    return $d.append($body);
+  }
+
   function globalsBlock(globals) {
-    var $b = el('fieldset', 'lp-vars').append(el('legend', null, 'Globale Werte'));
+    var missing = globals.filter(function (g) { return !g.set && !g.value; }).length;
+    var $c = el('span', 'lp-counts').append(missing ? pill('lp-st-diff', missing + ' fehlt') : pill('lp-st-ok', 'gesetzt'));
+    var $d = groupShell('globals', 'Globale Werte', 'gelten für alle Container', $c, missing > 0);
+    var $body = el('div', 'lp-grp-body');
     globals.forEach(function (g) {
       var $row = el('label', 'lp-var');
       $row.append(el('span', 'lp-var-name', g.id));
@@ -195,13 +274,14 @@
         $in.on('change', function () { st.globalsOverride[g.id] = $(this).val(); redraw(); });
         $row.append(el('span', 'lp-var-field').append($in, el('span', 'lp-muted lp-hint', g.set ? 'nur für jetzt geändert' : 'gilt nur für jetzt')));
       }
-      $b.append($row);
+      $body.append($row);
     });
-    return $b;
+    if (missing) $body.append(el('p', 'lp-muted lp-hint', 'Dauerhaft setzen kannst du globale Werte später auf der Einstellungsseite.'));
+    return $d.append($body);
   }
 
   function askedBlock(asked, ns) {
-    var $b = el('fieldset', 'lp-vars').append(el('legend', null, 'Werte für ' + ns.name));
+    var $b = el('div', 'lp-asked');
     asked.forEach(function (v) {
       var $in = $('<input type="text" class="lp-input">').val(v.value);
       $in.on('change', function () { LP.model.setAsked(st, ns, v.id, $(this).val()); redraw(); });
@@ -212,16 +292,17 @@
 
   function nsBar() {
     var $bar = el('div', 'lp-nsbar').append(el('span', 'lp-nsbar-label', 'Namespace:'));
+    var $tabs = el('div', 'lp-nstabs');
     st.namespaces.forEach(function (ns, i) {
       var text = ns.name + (st.kind === 'index' && ns.index ? ' #' + ns.index : '');
       var $t = el('button', 'lp-ns' + (i === st.active ? ' lp-ns-active' : '') + (ns.found ? '' : ' lp-ns-new'), text).attr('type', 'button');
       if (ns.primary) $t.attr('title', st.kind === 'name' && ns.key !== st.containerName ? 'aus Containername „' + st.containerName + '“' : 'Containername');
       $t.on('click', function () { st.active = i; redraw(); });
-      $bar.append($t);
+      $tabs.append($t);
     });
     var $add = el('button', 'lp-ns lp-ns-add').attr({ type: 'button', title: 'Namespace hinzufügen' }).append(icon('plus'));
     $add.on('click', function () {
-      var $in = $('<input type="text" class="lp-input lp-ns-input" placeholder="Name">');
+      var $in = $('<input type="text" class="lp-input lp-ns-input" placeholder="Name, Enter">');
       var $err = el('span', 'lp-error');
       $add.replaceWith($in, $err);
       $in.trigger('focus').on('keydown', function (e) {
@@ -232,25 +313,22 @@
         if (r.ok) redraw(); else $err.text(' ' + r.error);
       });
     });
-    $bar.append($add);
+    $tabs.append($add);
+    $bar.append($tabs);
     if (st.kind === 'name') {
       var ns = LP.model.activeNs(st);
-      if (ns && ns.primary && ns.key !== st.containerName) $bar.append(el('span', 'lp-muted', ' „' + st.containerName + '“ → ' + ns.key));
+      if (ns && ns.primary && ns.key !== st.containerName) $bar.append(el('span', 'lp-muted lp-hint', '„' + st.containerName + '“ → ' + ns.key));
     }
     return $bar;
   }
 
-  function groupBlock(g) {
-    var $b = el('fieldset', 'lp-group').append(el('legend', null, g.group.name + (g.scope === 'container' ? ' (pro Container)' : '')));
-    g.rows.forEach(function (r) { $b.append(labelRow(r)); });
-    return $b;
-  }
-
+  // ---- inputs
   function valueInput(r) {
     var t = r.def.type || 'text', $in;
+    if (t === 'schedule' && !st.textMode[r.id]) return scheduleInput(r);
     if (t === 'bool') {
       $in = $('<select class="lp-input"><option value="true">true</option><option value="false">false</option></select>');
-      if (r.value !== 'true' && r.value !== 'false') $in.append($('<option>').val(r.value).text(r.value));
+      if (r.value !== 'true' && r.value !== 'false') $in.prepend($('<option>').val(r.value).text(r.value));
     } else if (t === 'enum') {
       $in = $('<select class="lp-input"></select>');
       var opts = (r.def.options || []).slice();
@@ -263,45 +341,83 @@
     }
     $in.val(r.value);
     $in.on('change', function () { LP.model.setValue(st, r.id, $(this).val()); redraw(); });
+    if (t === 'schedule') return el('span', 'lp-sched-text').append($in, textToggle(r, false));
     return $in;
   }
 
+  var DAY_PRESETS = [['', 'täglich'], ['mon-fri', 'Mo–Fr'], ['sat-sun', 'Sa–So'], ['mon', 'Mo'], ['tue', 'Di'], ['wed', 'Mi'], ['thu', 'Do'], ['fri', 'Fr'], ['sat', 'Sa'], ['sun', 'So']];
+
+  function textToggle(r, toText) {
+    return el('a', 'lp-take', toText ? 'als Text' : 'als Liste').attr('href', '#').on('click', function (e) {
+      e.preventDefault(); st.textMode[r.id] = toText; redraw();
+    });
+  }
+
+  function scheduleInput(r) {
+    var R = LP.resolve, parsed = R.parseSchedule(r.value);
+    if (parsed.error && r.value) { st.textMode[r.id] = true; return valueInput(r); }
+    var entries = parsed.entries.length ? parsed.entries : [{ days: '', time: '' }];
+    var $box = el('div', 'lp-sched');
+    function commit() { LP.model.setValue(st, r.id, R.formatSchedule(entries)); redraw(); }
+    entries.forEach(function (en, i) {
+      var $days = $('<select class="lp-input lp-sched-days"></select>');
+      var known = DAY_PRESETS.some(function (p) { return p[0] === (en.days === 'daily' ? '' : en.days); });
+      if (!known) $days.append($('<option>').val(en.days).text(en.days));
+      DAY_PRESETS.forEach(function (p) { $days.append($('<option>').val(p[0]).text(p[1])); });
+      $days.val(en.days === 'daily' ? '' : en.days).on('change', function () { en.days = $(this).val(); commit(); });
+      var $time = $('<input type="time" class="lp-input lp-sched-time">').val(en.time).on('change', function () { en.time = $(this).val(); commit(); });
+      var $rm = el('button', 'lp-mini', '✕').attr({ type: 'button', title: 'Zeit entfernen' }).on('click', function () { entries.splice(i, 1); commit(); });
+      $box.append(el('div', 'lp-sched-row').append($days, $time, entries.length > 1 ? $rm : null));
+    });
+    var $more = el('button', 'lp-mini', '+ Zeit').attr('type', 'button').on('click', function () { entries.push({ days: '', time: '12:00' }); commit(); });
+    $box.append(el('div', 'lp-sched-foot').append($more, textToggle(r, true)));
+    return $box;
+  }
+
   function labelRow(r) {
-    var $r = el('div', 'lp-row' + (r.checked ? '' : ' lp-off'));
-    var $cb = $('<input type="checkbox" class="lp-check">').prop('checked', r.checked);
+    var $r = el('div', 'lp-row' + (r.checked ? '' : ' lp-off') + (r.existing && !r.checked ? ' lp-removing' : ''));
+    var $cb = $('<input type="checkbox" class="lp-check">').prop('checked', r.checked).attr('aria-label', r.def.title || r.key);
     $cb.on('change', function () { LP.model.setChecked(st, r.id, this.checked); redraw(); });
 
-    var $title = el('div', 'lp-row-title').append(el('span', 'lp-row-name', r.def.title || r.key));
-    var stt = STATUS[r.status];
-    $title.append(el('span', 'lp-status ' + stt[1], stt[0]));
-    if (r.def.description) $title.append(el('span', 'lp-help', '?').attr('title', r.def.description));
+    var $name = el('div', 'lp-cell-name').append(el('span', 'lp-row-name', r.def.title || r.key));
+    if (r.def.description) $name.append(el('span', 'lp-help', '?').attr('title', r.def.description));
+    $name.append(el('code', 'lp-key', r.key));
 
-    var $val = el('div', 'lp-row-value').append(valueInput(r));
+    var $val = el('div', 'lp-cell-value').append(valueInput(r));
     if (r.source && !r.touched && !r.existing) $val.append(el('span', 'lp-source', r.source));
-
-    var $meta = el('div', 'lp-row-meta').append(el('code', 'lp-key', r.key));
     if (r.status === 'abweichend' && r.proposedComplete && r.value !== r.proposed) {
       var $take = el('a', 'lp-take', 'übernehmen').attr('href', '#').on('click', function (e) { e.preventDefault(); LP.model.setValue(st, r.id, r.proposed); redraw(); });
-      $meta.append(el('div', 'lp-proposal').append('Vorschlag: ', el('code', null, r.proposed), ' ', $take));
+      $val.append(el('div', 'lp-proposal').append('Vorschlag: ', el('code', null, r.proposed), ' ', $take));
     }
     if (r.touched && r.existing && r.value !== r.existing.value) {
       var $undo = el('a', 'lp-take', 'zurück').attr('href', '#').on('click', function (e) { e.preventDefault(); LP.model.resetValue(st, r.id); redraw(); });
-      $meta.append(el('div', 'lp-proposal').append('bisher: ', el('code', null, r.existing.value), ' ', $undo));
+      $val.append(el('div', 'lp-proposal').append('bisher: ', el('code', null, r.existing.value), ' ', $undo));
     }
-    if (r.extra) $meta.append(el('div', 'lp-warn-text', 'Steht in Extra Parameters: ' + r.extra.value));
-    if (r.existing && !r.checked) $meta.append(el('div', 'lp-warn-text', 'wird beim Übernehmen entfernt'));
-    if (r.checked && r.error) $meta.append(el('div', 'lp-error', r.error));
-    if (r.checked && r.xss != null) $meta.append(el('div', 'lp-warn-text', 'Unraid entfernt < und > – kommt an als: ' + r.xss));
+    if (r.existing && r.srcKey && r.srcKey !== r.key && r.checked) $val.append(el('div', 'lp-warn-text', 'wird verschoben von ' + r.srcKey));
+    if (r.extra) $val.append(el('div', 'lp-warn-text', 'Steht in Extra Parameters: ' + r.extra.value));
+    if (r.existing && !r.checked) $val.append(el('div', 'lp-warn-text', 'wird beim Übernehmen entfernt'));
+    if (r.checked && r.error) $val.append(el('div', 'lp-error', r.error));
+    if (r.checked && r.xss != null) $val.append(el('div', 'lp-warn-text', 'Unraid entfernt < und > – kommt an als: ' + r.xss));
 
-    var $left = el('div', 'lp-row-left').append($title, el('code', 'lp-key', r.key));
-    $meta.find('.lp-key').remove();
-    return $r.append(el('label', 'lp-row-check').append($cb), el('div', 'lp-row-main').append($left, el('div', 'lp-row-right').append($val, $meta)));
+    var stt = r.existing && !r.checked ? ['entfernen', 'lp-st-err'] : STATUS[r.status];
+    return $r.append(el('label', 'lp-cell-check').append($cb), $name, $val, el('div', 'lp-cell-status').append(pill(stt[1], stt[0])));
   }
 
   function displayToggle() {
     var $s = $('<select class="lp-input"><option value="advanced">ausgeblendet einfügen (unter „Show more settings“)</option><option value="always">sichtbar einfügen</option></select>').val(st.display);
     $s.on('change', function () { LP.model.setDisplay(st, $(this).val()); });
-    return el('div', 'lp-display').append(el('span', null, 'Neue Labels: '), $s, el('span', 'lp-muted', ' Vorhandene Labels bleiben, wo sie sind.'));
+    return el('div', 'lp-display').append(el('span', null, 'Neue Labels: '), $s, el('span', 'lp-muted lp-hint', 'Vorhandene Labels bleiben, wo sie sind.'));
+  }
+
+  function updateSummary() {
+    var p = LP.model.plan(st);
+    var moved = p.remove.filter(function (r) { return r.moved; }).length;
+    var text = p.errors.length ? p.errors.length + ' Fehler – bitte korrigieren'
+      : 'Beim Übernehmen: ' + (p.add.length - moved) + ' hinzufügen, ' + p.update.length + ' ändern, ' + (p.remove.length - moved) + ' entfernen' + (moved ? ', ' + moved + ' verschieben' : '');
+    var $pane = $dlg.closest('.ui-dialog').find('.ui-dialog-buttonpane');
+    var $s = $pane.find('.lp-summary');
+    if (!$s.length) $s = el('span', 'lp-summary').prependTo($pane);
+    $s.text(text).toggleClass('lp-error', !!p.errors.length);
   }
 
   // ------------------------------------------------------------------ apply
@@ -314,7 +430,9 @@
     }
     if (!p.add.length && !p.update.length && !p.remove.length) { $dlg.dialog('close'); return; }
     var lines = [];
-    if (p.remove.length) lines.push('Entfernen:\n' + p.remove.map(function (r) { return '• ' + r.key; }).join('\n'));
+    var rm = p.remove.filter(function (r) { return !r.moved; }), mv = p.remove.filter(function (r) { return r.moved; });
+    if (rm.length) lines.push('Entfernen:\n' + rm.map(function (r) { return '• ' + r.key; }).join('\n'));
+    if (mv.length) lines.push('Umbenennen:\n' + mv.map(function (r) { return '• ' + r.key + ' → ' + r.moved; }).join('\n'));
     if (p.warnings.length) lines.push('Hinweise:\n' + p.warnings.map(function (w) { return '• ' + w.key + ': ' + w.text; }).join('\n'));
     if (lines.length && !confirm(lines.join('\n\n') + '\n\nTrotzdem übernehmen?')) return;
 
@@ -325,7 +443,7 @@
     p.add.forEach(function (a) { f.addLabel(a); if (a.display !== 'always') advanced = true; });
     f.finish({ revealAdvanced: advanced });
     $dlg.dialog('close');
-    toast(p.add.length + ' hinzugefügt, ' + p.update.length + ' geändert, ' + p.remove.length + ' entfernt. Zum Speichern „Apply“ klicken.');
+    toast((p.add.length - mv.length) + ' hinzugefügt, ' + p.update.length + ' geändert, ' + rm.length + ' entfernt' + (mv.length ? ', ' + mv.length + ' umbenannt' : '') + '. Zum Speichern „Apply“ klicken.');
   }
 
   function toast(text) {

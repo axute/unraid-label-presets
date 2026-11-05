@@ -1,0 +1,64 @@
+{
+  "id": "dockhand",
+  "name": "Dockhand",
+  "description": "Docker-Verwaltung: Updates, Anzeige, Links und Start/Stopp-Zeiten pro Container.",
+  "icon": "fa-anchor",
+  "docs": "https://dockhand.pro/manual/#container-labels",
+  "prefix": "dockhand.",
+  "namespace": "none",
+  "display": "advanced",
+  "groups": [
+    {
+      "name": "Anzeige",
+      "scope": "container",
+      "labels": [
+        { "key": "dockhand.name", "type": "text", "value": "${CONTAINER_NAME}", "title": "Anzeigename",
+          "description": "Nur Anzeige. Standard: Containername." },
+        { "key": "dockhand.url", "type": "text", "value": "${WEBUI_URL}", "title": "Link",
+          "description": "Klickbarer Link neben den Ports. URL oder [Name](URL)." },
+        { "key": "dockhand.order", "type": "number", "value": "100", "title": "Reihenfolge",
+          "description": "Kleiner steht weiter oben. Ohne Label: ans Ende." },
+        { "key": "dockhand.tags", "type": "text", "value": "", "title": "Tags",
+          "description": "Komma-getrennt, z. B. media, prod. Eintrag auch als name:farbe:icon." },
+        { "key": "dockhand.hidden", "type": "bool", "value": "true", "title": "In Dockhand ausblenden",
+          "description": "true blendet den Container in Dockhand aus. Standard false." }
+      ]
+    },
+    {
+      "name": "Updates",
+      "scope": "container",
+      "labels": [
+        { "key": "dockhand.update", "type": "bool", "value": "false", "title": "Automatische Updates",
+          "description": "false nimmt den Container von Auto-Updates, Sammel-Updates und der Update-Anzeige aus. Standard true." },
+        { "key": "dockhand.watch.digest", "type": "bool", "value": "false", "title": "Digest beobachten",
+          "description": "Auf neue Images mit gleichem Tag prüfen. Standard true." },
+        { "key": "dockhand.tag.include", "type": "text", "value": "^\\d+\\.\\d+\\.\\d+$", "title": "Tags einschließen (Regex)",
+          "description": "Nur passende Image-Tags gelten als Update. Nicht verankert: ^ und $ selbst setzen." },
+        { "key": "dockhand.tag.exclude", "type": "text", "value": "", "title": "Tags ausschließen (Regex)",
+          "description": "Gewinnt gegen „einschließen“." },
+        { "key": "dockhand.changelog.url", "type": "text", "value": "", "title": "Changelog-Link",
+          "description": "Ersetzt den Link zu den Release-Notes. Platzhalter {{version}} und {{tag}} möglich." },
+        { "key": "dockhand.skip.cooldown", "type": "bool", "value": "true", "title": "Wartezeit überspringen",
+          "description": "Nur ein ausdrückliches true wirkt. Standard false." }
+      ]
+    },
+    {
+      "name": "Zeitplan",
+      "scope": "container",
+      "labels": [
+        { "key": "dockhand.start.at", "type": "text", "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|\\S+ \\S+ \\S+ \\S+ \\S+)$", "value": "07:00", "title": "Starten um",
+          "description": "HH:MM oder Cron mit fünf Feldern, z. B. 0 7 * * 1-5. Überschreibt den Zeitplan im Dockhand-Editor." },
+        { "key": "dockhand.stop.at", "type": "text", "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|\\S+ \\S+ \\S+ \\S+ \\S+)$", "value": "23:00", "title": "Stoppen um",
+          "description": "HH:MM oder Cron mit fünf Feldern." }
+      ]
+    },
+    {
+      "name": "Benachrichtigungen",
+      "scope": "container",
+      "labels": [
+        { "key": "dockhand.notify", "type": "bool", "value": "false", "title": "Benachrichtigungen",
+          "description": "false unterdrückt Benachrichtigungen zu diesem Container. Standard true." }
+      ]
+    }
+  ]
+}

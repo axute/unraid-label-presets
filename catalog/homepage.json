@@ -1,0 +1,42 @@
+{
+  "id": "homepage",
+  "name": "Homepage",
+  "description": "Dashboard (gethomepage): legt eine Kachel für den Container an, optional mit Widgets.",
+  "icon": "fa-th-large",
+  "docs": "https://gethomepage.dev/configs/docker/#automatic-service-discovery",
+  "prefix": "homepage.",
+  "namespace": "none",
+  "display": "advanced",
+  "globals": ["HOMEPAGE_DEFAULT_GROUP"],
+  "groups": [
+    {
+      "name": "Kachel",
+      "scope": "container",
+      "labels": [
+        { "key": "homepage.group", "type": "text", "value": "${HOMEPAGE_DEFAULT_GROUP}", "title": "Gruppe",
+          "description": "Gruppe auf dem Dashboard, z. B. Media.", "recommended": true },
+        { "key": "homepage.name", "type": "text", "value": "${CONTAINER_NAME}", "title": "Name", "recommended": true },
+        { "key": "homepage.icon", "type": "text", "value": "${CONTAINER_NAME_LOWER}.png", "title": "Icon",
+          "description": "Dateiname aus Homepages Icon-Sammlung (z. B. emby.png) oder eine URL.", "recommended": true },
+        { "key": "homepage.href", "type": "text", "value": "${WEBUI_URL}", "title": "Link",
+          "description": "Wohin die Kachel verlinkt.", "recommended": true },
+        { "key": "homepage.description", "type": "text", "value": "${OVERVIEW}", "title": "Beschreibung" }
+      ]
+    },
+    {
+      "name": "Widget",
+      "scope": "container",
+      "repeat": { "single": "homepage.widget.", "multi": "homepage.widgets[${I}]." },
+      "labels": [
+        { "key": "${R}type", "type": "text", "value": "", "title": "Widget-Typ",
+          "description": "Name des Widgets, z. B. emby, sonarr, uptimekuma. Weitere Felder je Typ in der Homepage-Doku.", "recommended": true },
+        { "key": "${R}url", "type": "text", "value": "${WEBUI_URL}", "title": "URL",
+          "description": "Adresse, unter der Homepage den Dienst erreicht.", "recommended": true },
+        { "key": "${R}key", "type": "text", "mask": true, "value": "", "title": "API-Key",
+          "description": "Wird als Passwortfeld angelegt. Achtung: steht trotzdem im Template auf dem Stick und ist per docker inspect lesbar." },
+        { "key": "${R}fields", "type": "text", "pattern": "^\\[.*\\]$", "value": "[\"\"]", "title": "Felder",
+          "description": "Optional: JSON-Liste der angezeigten Felder, z. B. [\"queued\",\"wanted\"]." }
+      ]
+    }
+  ]
+}
