@@ -22,8 +22,13 @@ function lp_write_atomic(string $file, string $data): bool {
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') lp_out(false, 'Nur POST erlaubt.');
-$var = @parse_ini_file('/var/local/emhttp/var.ini') ?: [];
-if (empty($var['csrf_token']) || !hash_equals((string)$var['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) lp_out(false, 'Ungültiges csrf_token. Seite neu laden.');
+// Unraid's local_prepend.php (auto_prepend_file) already checked csrf_token for every
+// POST, terminated on a mismatch and removed the field from $_POST. Only check it
+// ourselves when that prepend did not run (CLI tests).
+if (!function_exists('csrf_terminate')) {
+    $var = @parse_ini_file('/var/local/emhttp/var.ini') ?: [];
+    if (empty($var['csrf_token']) || !hash_equals((string)$var['csrf_token'], (string)($_POST['csrf_token'] ?? ''))) lp_out(false, 'Ungültiges csrf_token. Seite neu laden.');
+}
 
 $action = (string)($_POST['action'] ?? '');
 

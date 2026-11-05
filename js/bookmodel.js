@@ -204,7 +204,9 @@
       };
     }
     var value = d.touched ? d.value : existing ? existing.value : prop.value;
-    var status = existing ? (prop.missing.length || existing.value === prop.value ? 'vorhanden' : 'abweichend') : extra ? 'extra' : 'neu';
+    // an empty catalog value means "no proposal": an existing value is then simply present
+    var noProposal = prop.value === '' || prop.missing.length > 0;
+    var status = existing ? (noProposal || existing.value === prop.value ? 'vorhanden' : 'abweichend') : extra ? 'extra' : 'neu';
     var error = d.checked ? validate(def, value) : null;
     var missing = d.touched || existing ? [] : prop.missing;
     if (d.checked && !error && missing.length) error = 'Variable fehlt: ' + missing.join(', ');
@@ -212,7 +214,7 @@
     var sources = R.varsIn(def.value).map(function (n) { return st.auto.sources[n] ? st.auto.sources[n] + ': ' + (st.auto.vars[n] || '') : ''; }).filter(Boolean);
     return {
       id: id, ns: ns, group: group, def: def, key: key, srcKey: srcKey, value: value,
-      proposed: prop.value, proposedComplete: !prop.missing.length,
+      proposed: prop.value, proposedComplete: !noProposal,
       existing: existing, extra: extra, checked: d.checked, touched: d.touched,
       status: status, error: error, missing: missing,
       xss: xss.changed ? xss.value : null, source: sources.join(', ')

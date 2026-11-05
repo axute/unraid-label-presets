@@ -163,3 +163,12 @@ test('empty container name: no namespace, name kind', () => {
   const st = M.createState(traefik, { formLabels: [], extraLabels: [], container: { ...container, name: '' }, env: {}, settings });
   assert.equal(st.namespaces[0].key, '');
 });
+
+test('empty catalog value is no proposal: existing priority stays "vorhanden"', () => {
+  const st = state(zipboomLabels);
+  const prio = find(st, 'traefik.http.routers.zipboom.priority');
+  assert.equal(prio.status, 'vorhanden');
+  assert.equal(prio.proposedComplete, false);
+  assert.equal(prio.value, '1');
+  assert.deepEqual(M.plan(st).update, []);
+});
