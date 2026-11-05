@@ -171,3 +171,13 @@ Konsequenz: `window.makeConfig(...)` erst zur Laufzeit (Klick) aufrufen, nie ein
 ## 10. PR #2619
 
 Enthalten: `<form … onsubmit="return prepareConfig(this)">` (:972), `prepareConfig()` (:810) normalisiert `contMyMAC`, setzt im Host-Netzwerk bei Port-Zeilen `confTarget` = `confValue` und füllt `contCPUset`. Betrifft Labels nicht.
+
+## 11. Speichern und Laden: Kodierung und XSS-Filter (getestet 2026-11-05)
+
+Test mit Label `lp.test` = `` Host(`a.b`) "q" 's' <t> & $x {0} `` (Container `zipboom`):
+
+- `docker inspect` liefert `` Host(`a.b`) "q" 's' t & $x {0} `` → **`<` und `>` fehlen**, alles andere ist korrekt.
+- Ursache: `xmlSecurity()` (Helpers.php:378), aufgerufen am Ende von `xmlToVar()`. Für **jeden** String im Template gilt: Ändert `strip_tags()` den Wert, werden alle `<` und `>` entfernt. XSS-Schutz von Unraid, betrifft Value, Default, Target usw.
+  → Label-Werte und Keys, die nach einem HTML-Tag aussehen (`<…>`), verlieren beim Erzeugen des Containers ihre spitzen Klammern. Einzelne `<` oder `>` ohne Tag-Form (z. B. `a < b`) bleiben erhalten, weil `strip_tags()` dann nichts ändert. (Das Template-XML enthält den Wert noch unverändert.)
+- Zusätzlich setzt `xmlToVar()` (Helpers.php:272) alle **Attribute** (`Name`, `Target`, `Default`, `Description` …) durch `strip_tags(html_entity_decode(…))`.
+- Doppelte Kodierung der Attribute im XML (`Default="&amp;lt;t&amp;gt;"`) ist **normal**: `postToXML()` ruft `xml_encode()` auf, und SimpleXML escaped bei der Zuweisung an Attribute ein zweites Mal. Beim Laden wird entsprechend zweimal dekodiert (`xml_decode()` + `html_entity_decode()`). Der Inhalt von `<Config>` (Value) wird nur einfach kodiert. Kein Fehler im Plugin.
