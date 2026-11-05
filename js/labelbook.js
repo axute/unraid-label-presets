@@ -276,7 +276,7 @@
       }
       $body.append($row);
     });
-    if (missing) $body.append(el('p', 'lp-muted lp-hint', 'Dauerhaft setzen kannst du globale Werte später auf der Einstellungsseite.'));
+    $body.append(el('p', 'lp-muted lp-hint').append('Dauerhaft festlegen: ', $('<a target="_blank"></a>').attr('href', DATA.settingsUrl || '/Settings/LabelPresets').text('Einstellungen → Label Presets'), ' (neuer Tab, danach das Buch neu öffnen).'));
     return $d.append($body);
   }
 

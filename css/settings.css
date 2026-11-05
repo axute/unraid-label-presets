@@ -1,0 +1,47 @@
+/* Label Presets – settings page */
+.lp-settings { max-width: 1100px; }
+.lp-settings, .lp-settings * { text-align: left; }
+.lp-intro { margin-top: 0; }
+.lp-muted { opacity: .7; }
+.lp-sec { margin: 1.5rem 0; }
+.lp-sec h3 { margin: 0 0 .3rem; }
+.lp-settings code { font-size: .95em; }
+
+.lp-globals { display: grid; gap: .4rem; margin: .6rem 0; }
+.lp-grow { display: grid; grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr) auto; gap: .2rem .8rem; align-items: center; }
+.lp-grow input { margin: 0; width: 100%; min-width: 0; box-sizing: border-box; }
+.lp-gname { font-family: monospace; }
+.lp-users { grid-column: 1 / -1; font-size: .9em; }
+.lp-users:empty { display: none; }
+.lp-settings .lp-mini { margin: 0; padding: .1rem .7rem; min-width: 0; text-transform: none; letter-spacing: normal; }
+
+.lp-dl { margin: .4rem 0; }
+.lp-actions { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.lp-msg.lp-ok { color: #3c9d3c; }
+.lp-msg.lp-bad { color: #e22828; }
+
+.lp-table-wrap { overflow-x: auto; }
+.lp-table { width: 100%; border-collapse: collapse; margin: .5rem 0; }
+.lp-table th, .lp-table td { padding: .5rem .6rem; border-bottom: 1px solid rgba(128,128,128,.25); vertical-align: top; }
+.lp-table th { font-weight: bold; }
+.lp-act { white-space: nowrap; text-align: right; }
+.lp-act .lp-mini + .lp-mini { margin-left: .4rem; }
+.lp-origin { font-size: .85em; padding: 0 .55rem; border-radius: 1rem; border: 1px solid currentColor; white-space: nowrap; }
+.lp-origin-mitgeliefert { opacity: .7; }
+.lp-origin-uberschrieben { color: #e68a00; }
+.lp-origin-eigen { color: #3b8fd9; }
+.lp-vis { white-space: nowrap; }
+
+.lp-editor { margin-top: 1rem; border: 1px solid rgba(128,128,128,.3); border-radius: 6px; padding: .8rem 1rem; }
+.lp-editor h4 { margin: 0 0 .5rem; }
+.lp-editor textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 1.2rem; line-height: 1.4; min-height: 24rem; }
+.lp-editor-bar { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-top: .5rem; }
+.lp-help-box { margin-top: .8rem; }
+.lp-help-box summary { cursor: pointer; }
+
+.lp-errbox { border: 1px solid #e68a00; border-radius: 6px; padding: .6rem .9rem; margin: 0 0 1rem; }
+
+@media (max-width: 700px) {
+  .lp-grow { grid-template-columns: 1fr auto; }
+  .lp-grow .lp-gvalue { grid-column: 1; }
+}

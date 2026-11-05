@@ -1,0 +1,9 @@
+Menu="Utilities"
+Title="Label Presets"
+Icon="book"
+Tag="book"
+Markdown="false"
+---
+<?PHP
+require_once "/usr/local/emhttp/plugins/label.presets/include/settings.php";
+?>

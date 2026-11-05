@@ -3,8 +3,9 @@
  * Shipped catalog: plugin dir catalog/*.json. User catalog on the flash drive
  * replaces a shipped service with the same id completely. */
 
-const LP_PLUGIN_DIR = '/usr/local/emhttp/plugins/label.presets';
-const LP_CONFIG_DIR = '/boot/config/plugins/label.presets';
+// overridable for tests (define before including this file)
+if (!defined('LP_PLUGIN_DIR')) define('LP_PLUGIN_DIR', '/usr/local/emhttp/plugins/label.presets');
+if (!defined('LP_CONFIG_DIR')) define('LP_CONFIG_DIR', '/boot/config/plugins/label.presets');
 
 function lp_read_json(string $file): ?array {
     if (!is_file($file)) return null;
