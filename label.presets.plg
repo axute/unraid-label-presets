@@ -47,12 +47,15 @@ must be idempotent. User data (settings.json, catalog/) is never touched.
 <FILE Run="/bin/bash">
 <INLINE>
 <![CDATA[
-mkdir -p "&cfgdir;/catalog"
+# note: XML entities are not expanded inside CDATA, so paths are literal here
+cfg=/boot/config/plugins/label.presets
+mkdir -p "$cfg/catalog"
+current=$(ls -1 "$cfg"/label.presets-*-noarch-1.txz 2>/dev/null | sort -V | tail -1)
 # keep only the current package on the flash drive
-find "&cfgdir;" -maxdepth 1 -name '&name;-*.txz' ! -name '&name;-&version;-noarch-1.txz' -delete
+[ -n "$current" ] && find "$cfg" -maxdepth 1 -name 'label.presets-*.txz' ! -name "$(basename "$current")" -delete
 echo ""
 echo "----------------------------------------------------"
-echo " &name; &version; installiert."
+echo " label.presets $(cat /usr/local/emhttp/plugins/label.presets/VERSION 2>/dev/null) installiert."
 echo " Label-Buch: Docker > Add/Edit Container > 'Label-Buch öffnen'"
 echo " Einstellungen: Settings > Utilities > Label Presets"
 echo "----------------------------------------------------"
@@ -68,10 +71,10 @@ catalog in &cfgdir; (only the package itself is deleted).
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 <![CDATA[
-removepkg "&name;-&version;-noarch-1" >/dev/null 2>&1
-rm -rf "&plugdir;"
-rm -f "&cfgdir;"/&name;-*.txz
-echo "&name; entfernt. Einstellungen und eigene Katalogeinträge bleiben in &cfgdir;."
+for p in /var/log/packages/label.presets-*; do [ -e "$p" ] && removepkg "$(basename "$p")" >/dev/null 2>&1; done
+rm -rf /usr/local/emhttp/plugins/label.presets
+rm -f /boot/config/plugins/label.presets/label.presets-*.txz
+echo "label.presets entfernt. Einstellungen und eigene Katalogeinträge bleiben in /boot/config/plugins/label.presets."
 ]]>
 </INLINE>
 </FILE>
