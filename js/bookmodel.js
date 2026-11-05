@@ -78,7 +78,9 @@
       display: service.display || settings.defaultDisplay || 'advanced',
       displayTouched: false,
       repeat: {},
-      open: {}
+      open: {},
+      // service already set up on this container? then "recommended" no longer preselects
+      used: (ctx.formLabels || []).some(function (l) { return service.prefix && l.key.indexOf(service.prefix) === 0; })
     };
     repeatGroups(service).forEach(function (g) {
       var det = R.detectRepeat(g.repeat, st.formList);
@@ -197,8 +199,11 @@
     var id = rep ? rep.id + '|' + def.key : rowId(ns, st, key);
     var d = st.drafts[id];
     if (!d) {
+      // recommended labels are preselected only where nothing is set up yet:
+      // a new namespace, a new repeat block, or a service not used on this container
+      var fresh = rep ? !rep.src : ns && st.kind !== 'split' ? !ns.found : !st.used;
       d = st.drafts[id] = {
-        checked: existing ? true : (!!def.recommended && !extra),
+        checked: existing ? true : (!!def.recommended && !extra && fresh),
         touched: false,
         value: ''
       };

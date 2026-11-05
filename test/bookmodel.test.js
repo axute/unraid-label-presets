@@ -41,23 +41,32 @@ test('existing labels: status and preselection', () => {
   assert.match(port.source, /aus WebUI: 80/);
   const ep = find(st, 'traefik.http.routers.zipboom.entrypoints');
   assert.equal(ep.status, 'neu');
-  assert.equal(ep.checked, true);
+  assert.equal(ep.checked, false);
   assert.equal(ep.value, 'websecure');
   const mw = find(st, 'traefik.http.routers.zipboom.middlewares');
   assert.equal(mw.checked, false);
 });
 
-test('plan without changes by user: adds recommended, keeps existing values', () => {
+test('service already used: missing recommended labels are not preselected', () => {
   const p = M.plan(state(zipboomLabels));
-  assert.deepEqual(p.add.map((a) => a.key).sort(), [
-    'traefik.http.routers.zipboom.entrypoints', 'traefik.http.routers.zipboom.service'
+  assert.deepEqual(p.add, []);
+  assert.deepEqual(p.update, []);
+  assert.deepEqual(p.remove, []);
+  const svc = find(state(zipboomLabels), 'traefik.http.routers.zipboom.service');
+  assert.equal(svc.checked, false);
+  assert.equal(svc.status, 'neu');
+});
+
+test('fresh container: recommended labels preselected, entrypoints not', () => {
+  const p = M.plan(state([]));
+  const keys = p.add.map((a) => a.key).sort();
+  assert.deepEqual(keys, [
+    'traefik.enable', 'traefik.http.routers.zipboom.rule', 'traefik.http.routers.zipboom.service',
+    'traefik.http.services.zipboom.loadbalancer.server.port'
   ]);
   assert.equal(p.add.find((a) => a.key.endsWith('.service')).value, 'zipboom');
   assert.equal(p.add[0].display, 'advanced');
   assert.match(p.add[0].name, /^Traefik: /);
-  assert.deepEqual(p.update, []);
-  assert.deepEqual(p.remove, []);
-  assert.deepEqual(p.errors, []);
 });
 
 test('unknown catalog label (priority) is kept: not in plan', () => {
@@ -86,7 +95,7 @@ test('missing global blocks only rows that need it', () => {
   const st = state([], [], { globals: {}, defaultDisplay: 'advanced' });
   const p = M.plan(st);
   const keys = p.errors.map((e) => e.key).sort();
-  assert.deepEqual(keys, ['traefik.http.routers.zipboom.entrypoints', 'traefik.http.routers.zipboom.rule']);
+  assert.deepEqual(keys, ['traefik.http.routers.zipboom.rule']);
   assert.match(p.errors[0].error, /Variable fehlt/);
   st.globalsOverride.DOMAIN = 'lan';
   st.globalsOverride.TRAEFIK_ENTRYPOINT = 'web';
@@ -110,7 +119,7 @@ test('second namespace: added, own rows, all applied together', () => {
   const p = M.plan(st);
   const apiKeys = p.add.filter((a) => a.key.includes('.zipboom-api.')).map((a) => a.key).sort();
   assert.deepEqual(apiKeys, [
-    'traefik.http.routers.zipboom-api.entrypoints', 'traefik.http.routers.zipboom-api.rule',
+    'traefik.http.routers.zipboom-api.rule',
     'traefik.http.routers.zipboom-api.service', 'traefik.http.services.zipboom-api.loadbalancer.server.port'
   ]);
   assert.equal(p.add.find((a) => a.key.endsWith('zipboom-api.rule')).value, 'Host(`zipboom-api.example.de`)');
