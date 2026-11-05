@@ -181,3 +181,7 @@ Test mit Label `lp.test` = `` Host(`a.b`) "q" 's' <t> & $x {0} `` (Container `zi
   → Label-Werte und Keys, die nach einem HTML-Tag aussehen (`<…>`), verlieren beim Erzeugen des Containers ihre spitzen Klammern. Genau: ein `<` gefolgt von einem Nicht-Leerzeichen **oder am Ende des Werts** gilt als Tag-Anfang (`a<b`, `a <`, `a << b` werden gefiltert); `a < b` und `a > b` bleiben erhalten. Nachgebaut in `resolve.xssFilter()`, abgeglichen mit PHP über `test/xss-php.sh`. (Das Template-XML enthält den Wert noch unverändert.)
 - Zusätzlich setzt `xmlToVar()` (Helpers.php:272) alle **Attribute** (`Name`, `Target`, `Default`, `Description` …) durch `strip_tags(html_entity_decode(…))`.
 - Doppelte Kodierung der Attribute im XML (`Default="&amp;lt;t&amp;gt;"`) ist **normal**: `postToXML()` ruft `xml_encode()` auf, und SimpleXML escaped bei der Zuweisung an Attribute ein zweites Mal. Beim Laden wird entsprechend zweimal dekodiert (`xml_decode()` + `html_entity_decode()`). Der Inhalt von `<Config>` (Value) wird nur einfach kodiert. Kein Fehler im Plugin.
+
+## 12. CSRF bei eigenen POST-Endpunkten
+
+`/etc/php.ini` setzt `auto_prepend_file=/usr/local/emhttp/webGui/include/local_prepend.php`. Das prüft bei **jedem** POST `csrf_token` (Feld oder Header `X-CSRF-Token`), beendet bei Fehlern mit Log-Eintrag und **entfernt das Feld danach aus `$_POST`**. Ein Plugin-Endpunkt darf `$_POST['csrf_token']` daher nicht selbst noch einmal prüfen. Erkennbar ist der gelaufene Prepend an `function_exists('csrf_terminate')`.
