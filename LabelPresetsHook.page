@@ -1,0 +1,11 @@
+Menu="Buttons:100"
+Title="Label Presets"
+Icon="book"
+Link="lp-hook"
+Cond="preg_match('/AddContainer|UpdateContainer/', $_SERVER['REQUEST_URI'])"
+Markdown="false"
+---
+<?PHP
+require_once "/usr/local/emhttp/plugins/label.presets/include/hook.php";
+lp_inject();
+?>
