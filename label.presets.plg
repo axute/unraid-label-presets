@@ -1,0 +1,79 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "label.presets">
+<!ENTITY author    "axute">
+<!ENTITY version   "2026.11.05">
+<!ENTITY sha256    "810018e338e09163dc89db0da08b9fad3cd42f9022b15433bebcd9dd0d30eaf7">
+<!ENTITY github    "axute/unraid-label-presets">
+<!ENTITY branch    "main">
+<!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/&branch;/&name;.plg">
+<!ENTITY packageURL "https://github.com/&github;/releases/download/&version;/&name;-&version;-noarch-1.txz">
+<!ENTITY plugdir   "/usr/local/emhttp/plugins/&name;">
+<!ENTITY cfgdir    "/boot/config/plugins/&name;">
+]>
+
+<PLUGIN
+  name="&name;"
+  author="&author;"
+  version="&version;"
+  launch="Settings/LabelPresets"
+  pluginURL="&pluginURL;"
+  support="https://github.com/&github;/issues"
+  icon="book"
+  min="7.0.0"
+>
+
+<CHANGES>
+<![CDATA[
+### 2026.11.05
+- Erste Version: Label-Buch auf der Add/Edit-Container-Seite mit Katalogen für Traefik, Docktail, Homepage, Controlarr und Dockhand.
+- Einstellungsseite unter Settings → Utilities → Label Presets: globale Werte, Standard-Anzeige, eigene Katalogeinträge.
+]]>
+</CHANGES>
+
+<!--
+Package. If the file already exists on the flash drive with the right SHA256,
+Unraid uses it and does not download anything (local install).
+-->
+<FILE Name="&cfgdir;/&name;-&version;-noarch-1.txz" Run="upgradepkg --install-new">
+<URL>&packageURL;</URL>
+<SHA256>&sha256;</SHA256>
+</FILE>
+
+<!--
+Install script. Unraid runs every /boot/config/plugins/*.plg at boot, so this
+must be idempotent. User data (settings.json, catalog/) is never touched.
+-->
+<FILE Run="/bin/bash">
+<INLINE>
+<![CDATA[
+mkdir -p "&cfgdir;/catalog"
+# keep only the current package on the flash drive
+find "&cfgdir;" -maxdepth 1 -name '&name;-*.txz' ! -name '&name;-&version;-noarch-1.txz' -delete
+echo ""
+echo "----------------------------------------------------"
+echo " &name; &version; installiert."
+echo " Label-Buch: Docker > Add/Edit Container > 'Label-Buch öffnen'"
+echo " Einstellungen: Settings > Utilities > Label Presets"
+echo "----------------------------------------------------"
+echo ""
+]]>
+</INLINE>
+</FILE>
+
+<!--
+Remove script. Removes the plugin files, keeps the user's settings and
+catalog in &cfgdir; (only the package itself is deleted).
+-->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+<![CDATA[
+removepkg "&name;-&version;-noarch-1" >/dev/null 2>&1
+rm -rf "&plugdir;"
+rm -f "&cfgdir;"/&name;-*.txz
+echo "&name; entfernt. Einstellungen und eigene Katalogeinträge bleiben in &cfgdir;."
+]]>
+</INLINE>
+</FILE>
+
+</PLUGIN>
