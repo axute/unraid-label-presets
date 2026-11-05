@@ -1,0 +1,69 @@
+{
+  "id": "traefik",
+  "name": "Traefik",
+  "description": "Reverse Proxy: macht den Container unter einer Domain erreichbar.",
+  "icon": "fa-random",
+  "docs": "https://doc.traefik.io/traefik/reference/routing-configuration/other-providers/docker/",
+  "prefix": "traefik.",
+  "namespace": "name",
+  "display": "advanced",
+  "variables": [
+    { "id": "SUBDOMAIN", "label": "Subdomain", "default": "${NS}" }
+  ],
+  "globals": ["DOMAIN", "TRAEFIK_ENTRYPOINT", "TRAEFIK_CERTRESOLVER"],
+  "groups": [
+    {
+      "name": "Basis",
+      "scope": "container",
+      "labels": [
+        { "key": "traefik.enable", "type": "bool", "value": "true", "title": "Traefik aktivieren",
+          "description": "Traefik berücksichtigt den Container. Nötig, wenn Traefik mit exposedByDefault=false läuft.",
+          "recommended": true },
+        { "key": "traefik.docker.network", "type": "text", "value": "${NETWORK}", "title": "Docker-Netzwerk",
+          "description": "Netzwerk, über das Traefik den Container erreicht. Nötig, wenn der Container in mehreren Netzwerken hängt, sonst wählt Traefik zufällig." }
+      ]
+    },
+    {
+      "name": "Router",
+      "scope": "namespace",
+      "labels": [
+        { "key": "traefik.http.routers.${NS_KEY}.rule", "type": "text", "value": "Host(`${SUBDOMAIN}.${DOMAIN}`)", "title": "Regel",
+          "description": "Unter welcher Adresse der Dienst erreichbar ist, z. B. Host(`app.example.de`) oder PathPrefix(`/app`).",
+          "recommended": true },
+        { "key": "traefik.http.routers.${NS_KEY}.entrypoints", "type": "text", "value": "${TRAEFIK_ENTRYPOINT}", "title": "Entrypoints",
+          "description": "Komma-getrennte Liste der Traefik-Entrypoints, z. B. websecure.",
+          "recommended": true },
+        { "key": "traefik.http.routers.${NS_KEY}.service", "type": "text", "value": "${NS_KEY}", "title": "Service",
+          "description": "Welcher Service die Anfragen bekommt. Bei mehreren Routern pro Container Pflicht, sonst schadet es nicht.",
+          "recommended": true },
+        { "key": "traefik.http.routers.${NS_KEY}.middlewares", "type": "text", "value": "", "title": "Middlewares",
+          "description": "Komma-getrennte Liste, z. B. auth@file,compress@file." },
+        { "key": "traefik.http.routers.${NS_KEY}.priority", "type": "number", "min": 1, "value": "", "title": "Priorität",
+          "description": "Höhere Zahl gewinnt, wenn mehrere Regeln passen." }
+      ]
+    },
+    {
+      "name": "Service",
+      "scope": "namespace",
+      "labels": [
+        { "key": "traefik.http.services.${NS_KEY}.loadbalancer.server.port", "type": "port", "value": "${WEBUI_PORT}", "title": "Port im Container",
+          "description": "Port, auf dem die Anwendung im Container lauscht. Ohne Label nimmt Traefik den ersten freigegebenen Port.",
+          "recommended": true },
+        { "key": "traefik.http.services.${NS_KEY}.loadbalancer.server.scheme", "type": "enum", "options": ["http", "https"], "value": "http", "title": "Protokoll zum Container",
+          "description": "Nur nötig, wenn die Anwendung selbst HTTPS spricht." },
+        { "key": "traefik.http.services.${NS_KEY}.loadbalancer.passhostheader", "type": "bool", "value": "true", "title": "Host-Header weitergeben",
+          "description": "Original-Host-Header an den Container weitergeben." }
+      ]
+    },
+    {
+      "name": "TLS",
+      "scope": "namespace",
+      "labels": [
+        { "key": "traefik.http.routers.${NS_KEY}.tls", "type": "bool", "value": "true", "title": "TLS aktivieren",
+          "description": "Router nimmt nur HTTPS-Verbindungen an." },
+        { "key": "traefik.http.routers.${NS_KEY}.tls.certresolver", "type": "text", "value": "${TRAEFIK_CERTRESOLVER}", "title": "Zertifikat-Resolver",
+          "description": "Name des Cert-Resolvers aus der Traefik-Konfiguration, z. B. letsencrypt." }
+      ]
+    }
+  ]
+}
