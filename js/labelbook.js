@@ -60,8 +60,8 @@
       height: Math.min(760, $(window).height() - 48),
       close: function () { $dlg.empty(); st = null; }
     });
-    // Unraid styles all dialogs through dialogStyle(); keep the close button visible for us
-    $dlg.closest('.ui-dialog').addClass('lp-dialog').find('.ui-dialog-titlebar-close').show();
+    // like Unraid's own dialogs: no titlebar close button ("Abbrechen" and Esc close)
+    $dlg.closest('.ui-dialog').addClass('lp-dialog').find('.ui-dialog-titlebar-close').hide();
     renderIndex();
   }
 
@@ -153,7 +153,10 @@
 
     // global variables
     var globals = M.globalVars(st);
-    if (globals.length) $dlg.append(globalsBlock(globals));
+    if (globals.length) {
+      $dlg.append(globalsBlock(globals));
+      if (globals.some(function (g) { return !g.set; })) $dlg.find('.lp-vars').last().append(el('p', 'lp-muted lp-hint', 'Dauerhaft setzen kannst du globale Werte später auf der Einstellungsseite.'));
+    }
 
     // container groups
     var groups = M.rows(st);
@@ -186,11 +189,11 @@
       var $row = el('label', 'lp-var');
       $row.append(el('span', 'lp-var-name', g.id));
       if (g.set && !g.overridden) {
-        $row.append(el('code', 'lp-var-value', g.value), el('span', 'lp-muted', ' (Einstellungen)'));
+        $row.append(el('span', 'lp-var-field').append(el('code', 'lp-var-value', g.value), el('span', 'lp-muted lp-hint', 'aus den Einstellungen')));
       } else {
         var $in = $('<input type="text" class="lp-input">').val(g.value).attr('placeholder', 'noch nicht gesetzt');
         $in.on('change', function () { st.globalsOverride[g.id] = $(this).val(); redraw(); });
-        $row.append($in, el('span', 'lp-muted', g.set ? ' (nur für jetzt geändert)' : ' (nur für jetzt – dauerhaft in den Einstellungen)'));
+        $row.append(el('span', 'lp-var-field').append($in, el('span', 'lp-muted lp-hint', g.set ? 'nur für jetzt geändert' : 'gilt nur für jetzt')));
       }
       $b.append($row);
     });
@@ -202,7 +205,7 @@
     asked.forEach(function (v) {
       var $in = $('<input type="text" class="lp-input">').val(v.value);
       $in.on('change', function () { LP.model.setAsked(st, ns, v.id, $(this).val()); redraw(); });
-      $b.append(el('label', 'lp-var').append(el('span', 'lp-var-name', v.label), $in));
+      $b.append(el('label', 'lp-var').append(el('span', 'lp-var-name', v.label), el('span', 'lp-var-field').append($in)));
     });
     return $b;
   }
@@ -290,7 +293,9 @@
     if (r.checked && r.error) $meta.append(el('div', 'lp-error', r.error));
     if (r.checked && r.xss != null) $meta.append(el('div', 'lp-warn-text', 'Unraid entfernt < und > – kommt an als: ' + r.xss));
 
-    return $r.append(el('label', 'lp-row-check').append($cb), el('div', 'lp-row-main').append($title, $val, $meta));
+    var $left = el('div', 'lp-row-left').append($title, el('code', 'lp-key', r.key));
+    $meta.find('.lp-key').remove();
+    return $r.append(el('label', 'lp-row-check').append($cb), el('div', 'lp-row-main').append($left, el('div', 'lp-row-right').append($val, $meta)));
   }
 
   function displayToggle() {
